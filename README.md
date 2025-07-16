@@ -52,7 +52,6 @@ source venv/bin/activate # On Windows, use `venv\Scripts\activate`
 # Install the required packages
 pip install -r requirements.txt
 ```
-*(Note: You will need to create a `requirements.txt` file containing `streamlit`, `google-generativeai`, `supabase`, and `python-dotenv`)*
 
 ### 3. Set Up Environment Variables
 
@@ -79,9 +78,8 @@ SUPABASE_KEY="YOUR_SUPABASE_ANON_KEY"
 Once the setup is complete, run the following command in your terminal:
 
 ```bash
-streamlit run app.py
+streamlit run main.py
 ```
-*(Assuming your Python script is named `app.py`)*
 
 Your browser should automatically open a new tab with the chatbot interface running.
 
