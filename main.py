@@ -1,79 +1,123 @@
-'''
-Task: Assist a technology ecommerce company named
-"Makers Tech" in creating a ChatBot that responds
-to and informs users through a graphical interface
-about the inventory, features, and prices of the
-products currently available. This is based on the 
-question asked.
-
-Main Goal: use an AI system to provide real-time
-inventory information through a personalized
-conversation.
-
-What do we have in our project?
-- A main.py file that contains the main logic of the chatbot.
-- A requirements.txt file that lists the dependencies needed for the chatbot to run.
-- A README.md file that provides an overview of the project and how to set it up.
-
-- A Supabase simple database that stores the product information.
-- Streamlit for creating the web application interface.
-- An AI model for processing user queries and providing relevant responses.
-'''
-
-# Makers Tech ChatBot
+# Makers Tech ChatBot - Revised
 import streamlit as st
-import os, sys
+import os
+import sys
 from supabase import create_client, Client
-from google import genai
+import google.generativeai as genai
 from dotenv import load_dotenv
 
+# --- INITIALIZATION ---
+def init_app():
+    """Initializes environment variables and API clients."""
+    load_dotenv()
+    # Check for and configure Gemini API key
+    gemini_api_key = os.environ.get("GEMINI_API_KEY")
+    if not gemini_api_key:
+        st.error("GEMINI_API_KEY not found. Please set it in your .env file.")
+        st.stop()
+    genai.configure(api_key=gemini_api_key)
 
-load_dotenv() # Load environment variables from .env file
+    # Check for and create Supabase client
+    supabase_url = os.environ.get("SUPABASE_URL")
+    supabase_key = os.environ.get("SUPABASE_KEY")
+    if not supabase_url or not supabase_key:
+        st.error("Supabase URL or Key not found. Please set them in your .env file.")
+        st.stop()
+    supabase_client = create_client(supabase_url, supabase_key)
+    
+    return supabase_client
 
-# The client gets the API key from the environment variable `GEMINI_API_KEY`.
-gemini_api_key = os.environ.get("GEMINI_API_KEY")
-if not gemini_api_key:
-    st.error("GEMINI_API_KEY not found in environment variables. Please set it in your .env file.")
-    st.stop()
-gemini_client = genai.Client(api_key=gemini_api_key)
+# --- DATA & AI FUNCTIONS ---
+def get_product_data(db_client: Client):
+    """
+    Fetches product data from Supabase.
+    
+    Future Improvement: This should be replaced with a vector search
+    to retrieve only relevant products based on the user's question.
+    """
+    try:
+        # For now, we still fetch all, but the logic is isolated.
+        response = db_client.table("Product Data").select("*").execute()
+        return response.data if response.data else []
+    except Exception as e:
+        st.error(f"Error connecting to the database: {e}")
+        return []
 
-# Initializing the Supabase client
-supabase_url: str = os.environ.get("SUPABASE_URL")
-supabase_key: str = os.environ.get("SUPABASE_KEY")
-supabase: Client = create_client(supabase_url, supabase_key)
+def get_ai_response(question: str, products: list) -> str:
+    """Generates a response from the AI based on the user question and product data."""
+    product_info = "\n".join([
+        f"- {p['name']}: {p['description']} (${p['price']}, {p['stock_count']} in stock)"
+        for p in products
+    ])
 
-st.title("Makers Agentic Inventory ChatBot")
-st.write("Ask a question about our inventory below:")
+    prompt = f"""
+    You are a friendly and expert AI assistant for "Makers Tech", a technology ecommerce company.
+    Your role is to answer user questions about our products based *only* on the inventory data provided below.
+    If the information is not in the data, politely state that you don't have that information.
+    
+    Here is the current inventory:
+    {product_info}
+    ---
+    User question: {question}
+    """
+    
+    try:
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        st.error(f"Error generating AI response: {e}")
+        return "Sorry, I'm having trouble thinking right now. Please try again later."
 
-user_question = st.text_input("Your Question:")
+# --- STREAMLIT UI ---
+st.title("🤖 Makers Tech Inventory ChatBot")
+st.write("Ask me anything about our products, prices, or stock!")
+
+# Initialize clients and session state
+supabase_client = init_app()
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# Display chat messages from history
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
 
-if st.button("Submit"):
-    if user_question:
-        # Example: fetch all products (improvements needed in the future)
-        products_response = supabase.table("Product Data").select("*").execute()
-        products = products_response.data if products_response.data else []
 
-        # Format product info for Gemini
-        product_info = ""
-        for p in products:
-            product_info += f"- {p['name']}: {p['description']} (${p['price']}, {p['stock_count']} in stock)\n"
+# React to user input (chat-style UI)
+if user_question := st.chat_input("What are you looking for?"):
+    # Add user message to chat history
+    st.session_state.messages.append({"role": "user", "content": user_question})
+    with st.chat_message("user"):
+        st.markdown(user_question)
 
-        prompt = f"""
-        You are an expert AI assistant for Makers Tech.
-        Here is the current inventory:
-        {product_info}
-        ---
-        User question: {user_question}
-        Answer the user's question using only the inventory above.
-        """
+    # Display bot response in chat message container
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            # 1. Get data (fetch all products for now)
+            products_response = supabase_client.table("Product Data").select("*").execute()
+            products = products_response.data if products_response.data else []
 
-        # Get response from Gemini AI
-        response = gemini_client.models.generate_content(
-              model="gemini-2.5-flash",
-              contents=prompt
-        )
-        # Print the response
-        st.write(response.text)
-    else:
-        st.error("Please enter a question.")
+            # 2. Format product info for Gemini
+            product_info = ""
+            for p in products:
+                product_info += f"- {p['name']}: {p['description']} (${p['price']}, {p['stock_count']} in stock)\n"
+
+            prompt = f"""
+            You are an expert AI assistant for Makers Tech.
+            Here is the current inventory:
+            {product_info}
+            ---
+            User question: {user_question}
+            Answer the user's question using only the inventory above.
+            """
+
+            # 3. Get response from Gemini AI
+            model = genai.GenerativeModel('gemini-2.5-flash')
+            response = model.generate_content(prompt)
+            st.markdown(response.text)
+            final_response = response.text
+        
+    # Add bot response to chat history
+    st.session_state.messages.append({"role": "assistant", "content": final_response})
