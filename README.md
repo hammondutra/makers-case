@@ -97,4 +97,4 @@ This project serves as a great proof-of-concept. Here are some planned enhanceme
 
 ## 📄 License
 
-This project is licensed under the MIT License. See the `LICENSE` file for more details.
+This project is licensed under the MIT License.
