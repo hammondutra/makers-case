@@ -2,7 +2,7 @@
 
 A simple yet powerful chatbot built with Streamlit and Google's Gemini AI to answer customer questions about product inventory. The chatbot connects to a Supabase database to fetch real-time product information, providing an interactive conversational experience for users of the "Makers Tech" e-commerce store.
 
-![ChatBot Demo](https://i.imgur.com/your-demo-image.gif) 
+![ChatBot Demo](https://drive.google.com/file/d/1RRYX6NBSkGxpdlUeGlePlQMecxmXzctO/view?usp=sharing) 
 *Note: You should replace the link above with a real screenshot or GIF of your application.*
 
 ---
